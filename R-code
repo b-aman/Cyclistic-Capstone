@@ -1,0 +1,248 @@
+#----------------installing packages---------------------------------#
+install.packages("tidyverse")
+install.packages("janitor")
+install.packages("skimr")
+install.packages("lubridate")
+install.packages("tibble")
+install.packages("dplyr")
+install.packages("zoo")
+
+library("zoo")
+library("tidyverse")
+library("janitor")
+library("skimr")
+library("lubridate")
+library(readr)
+library(tibble)
+library(dplyr)
+
+#-----------------------import data-----------------------------------#
+
+q1 <- read_csv("202101-divvy-tripdata.csv", show_col_types = FALSE)
+q2 <- read_csv("202102-divvy-tripdata.csv", show_col_types = FALSE)
+q3 <- read_csv("202103-divvy-tripdata.csv", show_col_types = FALSE)
+q4 <- read_csv("202104-divvy-tripdata.csv", show_col_types = FALSE)
+q5 <- read_csv("202105-divvy-tripdata.csv", show_col_types = FALSE)
+q6 <- read_csv("202106-divvy-tripdata.csv", show_col_types = FALSE)
+q7 <- read_csv("202107-divvy-tripdata.csv", show_col_types = FALSE)
+q8 <- read_csv("202108-divvy-tripdata.csv", show_col_types = FALSE)
+q9 <- read_csv("202109-divvy-tripdata.csv", show_col_types = FALSE)
+q10 <- read_csv("202110-divvy-tripdata.csv", show_col_types = FALSE)
+q11 <- read_csv("202111-divvy-tripdata.csv", show_col_types = FALSE)
+q12 <- read_csv("202112-divvy-tripdata.csv", show_col_types = FALSE)
+
+#-----------------------merging the datasets--------------------------#
+
+tripdata_2021 <- bind_rows(q1, q2, q3, q4, q5, q6, q7, q8, q9, q10, q11, q12)
+
+
+#-----------------------calculate trip duration------------------------#
+
+(tripdata_2021 <- tripdata_2021 %>%
+    mutate(trip_duration_minutes = minute(seconds_to_period(ended_at-started_at)),.after = ended_at) %>%
+    arrange(desc(trip_duration_minutes)) 
+)
+
+#-----------------------view weekday-----------------------------------#
+
+(tripdata_2021 <- tripdata_2021 %>%
+    mutate(started_at_weekday = strftime(started_at, "%A"))
+)
+
+#-----------------------view month-----------------------------------#
+
+(tripdata_2021 <- tripdata_2021 %>%
+    mutate(started_at_month = months(as.Date(started_at))
+    ))
+
+#-----------------------view quarter-----------------------------------#
+
+(tripdata_2021 <- tripdata_2021 %>%
+    mutate(quarter = as.yearqtr(started_at, format = "%q"))
+)
+
+#--------summary of trip duration by each day for member vs causal----#
+
+tripdata_2021 %>%
+  group_by(started_at_weekday, member_casual) %>%
+  summarize(
+    mean_trip_duration = mean(trip_duration_minutes),
+    median_trip_duration = median(trip_duration_minutes),
+    max_trip_duration = max(trip_duration_minutes),
+    total_trips = n(),
+  ) %>%
+  arrange(desc(total_trips))
+
+#------------Rider type versus weekday: number of trips--------------#
+# analyzing ridership data by rider type and weekday
+
+smry_type_weekday <- tripdata_2021 %>%
+  group_by(member_casual, started_at_weekday) %>%
+  summarize(
+    number_of_trips = n(),
+    average_duration = mean(trip_duration_minutes), 
+    median_duration = median(trip_duration_minutes), 
+    max_trip_duration = max(trip_duration_minutes)
+  ) %>%
+  arrange(member_casual, started_at_weekday)
+smry_type_weekday
+
+# visualizing the daily number of trips by rider type
+
+smry_type_weekday %>%
+  ggplot(aes(x = factor(started_at_weekday, weekdays(as.Date('1970-01-03') + 1:7)), number_of_trips, fill = member_casual)) +
+  geom_col(position = "dodge") +
+  labs(
+    title = "Daily number of trips in 2021",
+    subtitle = "Based on rider type: casual and member",
+    x = "Day of week",
+    y = "Number of trips",
+    fill = "Rider type"
+  )
+
+#---------Rider type versus weekday: average trip of duration----------#
+
+# visualizing daily average of trip duration by rider type
+
+smry_type_weekday %>%
+  ggplot(aes(x = factor(started_at_weekday, weekdays(as.Date('1970-01-03') + 1:7)), average_duration, fill = member_casual)) +
+  geom_col(position = "dodge") +
+  labs(
+    title = "Daily average of trip duration in 2021",
+    subtitle = "Based on rider type: casual and member",
+    x = "Day of week",
+    y = "Average duration (min)",
+    fill = "Rider type"
+  )
+
+#-----------------------Rider type versus weekday: median trip of duration--------------------------------#
+
+# visualizing the daily number of trips by rider type
+
+smry_type_weekday %>%
+  ggplot(aes(x = factor(started_at_weekday, weekdays(as.Date('1970-01-03') + 1:7)), median_duration, fill = member_casual)) +
+  geom_col(position = "dodge") +
+  labs(
+    title = "Daily median of trip duration in 2021",
+    subtitle = "Based on rider type: casual and member",
+    x = "Day of week",
+    y = "Median of trip duration (min)",
+    fill = "Rider type"
+  )
+#-----------------------Rider type versus monthly: number of trips------------#
+
+# analyzing ridership data by rider type and month
+smry_type_month <- tripdata_2021 %>%
+  group_by(member_casual,started_at_month) %>%
+  summarize(
+    number_of_trips = n(),
+    average_duration = mean(trip_duration_minutes),
+    median_duration = median(trip_duration_minutes)
+  ) %>%
+  arrange(started_at_month)
+smry_type_month
+
+#-----------------------Rider type versus month: number of trips--------------------------------#
+
+smry_type_month %>%
+  ggplot(aes(x=factor(started_at_month,levels=month.name), number_of_trips, fill = member_casual))+
+  geom_col(position = "dodge") +
+  labs(
+    title = "Monthly number of trips based on rider type",
+    subtitle = "Based on rider type: casual and member",
+    x = "Month",
+    y = "Number of trips",
+    fill = "Rider type"
+  )
+
+#-----------------------Rider type versus month: median trip of duration--------------------------------#
+
+smry_type_month %>%
+  ggplot(aes(x=factor(started_at_month,levels=month.name), median_duration, fill = member_casual)) +
+  geom_col(position = "dodge") +
+  labs(
+    title = "Monthly median duration based on rider type",
+    subtitle = "Based on rider type: casual and member",
+    x = "Month",
+    y = "Median duration (min)",
+    fill = "Rider type"
+  )
+
+#-----------------------Rider type versus month: median trip of duration--------------------------------#
+
+smry_type_month %>%
+  ggplot(aes(x=factor(started_at_month,levels=month.name), average_duration, fill = member_casual)) +
+  geom_col(position = "dodge") +
+  labs(
+    title = "Monthly average duration based on rider type",
+    subtitle = "Based on rider type: casual and member",
+    x = "Month",
+    y = "Average duration (min)",
+    fill = "Rider type",
+    levels = month.abb
+  )
+
+#-----------------------Rider type versus quarter: median trip of duration--------------------------------#
+
+# creating summary table
+smry_type_quarter <- tripdata_2021 %>%
+  group_by(member_casual, quarter) %>%
+  summarize(
+    number_of_trips = n(),
+    average_duration = mean(trip_duration_minutes), 
+    median_duration = median(trip_duration_minutes)
+  ) %>%
+  arrange(member_casual, quarter)
+
+smry_type_quarter
+
+# number of trips per quarter
+ggplot(smry_type_quarter, aes(quarter, number_of_trips, fill = member_casual)) +
+  geom_col(position = "dodge") +
+  labs(
+    title = "Quarterly total trips based on rider type",
+    subtitle = "Based on rider type: casual and member",
+    x = "Quarter",
+    y = "Total trips",
+    fill = "Rider type"
+  )
+
+# Average duration per quarter
+ggplot(smry_type_quarter, aes(quarter, average_duration, fill = member_casual)) +
+  geom_col(position = "dodge") +
+  labs(
+    title = "Quarterly average duration based on rider type",
+    subtitle = "Based on rider type: casual and member",
+    x = "Quarter",
+    y = "Average duration (min)",
+    fill = "Rider type"
+  )
+
+ggplot(smry_type_quarter, aes(quarter, median_duration, fill = member_casual)) +
+  geom_col(position = "dodge") +
+  labs(
+    title = "Quarterly median duration based on Rider type",
+    subtitle = "Based on rider type: casual and member",
+    x = "Quarter",
+    y = "Median duration (min)",
+    fill = "Rider type"
+  )
+
+#-----------------------Station analysis--------------------------------#
+
+station_analysis <- tripdata_2021 %>%
+  na.omit(start_station_name) %>%
+  group_by(member_casual, start_station_name) %>%
+  summarize(no_of_rides = n()) %>%
+  arrange(desc(no_of_rides)) 
+
+station_casual <- (filter(station_analysis, member_casual == "casual"))[1:50, ] 
+station_annual <- filter(station_analysis, member_casual == "member")[1:50, ]
+
+common_station <- merge(station_casual, station_annual, by = "start_station_name")
+
+common_station <- common_station %>% 
+  mutate(total_rides = common_station$no_of_rides.x + common_station$no_of_rides.y) %>%
+  arrange(desc(no_of_rides.x))
+
+head(common_station, 10)
